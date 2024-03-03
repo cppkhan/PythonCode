@@ -1,4 +1,5 @@
 import csv
+import threading
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
@@ -10,23 +11,24 @@ def save_results_to_csv(results):
         writer.writerow(['Question', 'Response'])
         writer.writerows(results)
 
+def get_input(response):
+    response[0] = input("Enter Start:").lower()
+
 # Function to press the start button
-def press_start_button(driver):
+def press_start_button(driver, response):
     start_button = WebDriverWait(driver, 10).until(
         EC.element_to_be_clickable((By.CLASS_NAME, 'button--big'))
     )
-    
-    response = input("Enter Start:")
-    print(response)
-    if response=='Start':
-        start_button.click()
-        # Navigate and answer questions
-        results = navigate_and_answer_questions(driver)
-        # Save results to CSV
-        save_results_to_csv(results)
-    else:
-        print("Enter Valid Value")
+    threading.Thread(target=get_input, args=(response,)).start()
 
+    while not response[0] or response[0] not in {'start'}:
+        pass  # Wait for user input
+
+    start_button.click()
+    # Navigate and answer questions
+    results = navigate_and_answer_questions(driver)
+    # Save results to CSV
+    save_results_to_csv(results)
 
 # Function to navigate through questions and record answers
 def navigate_and_answer_questions(driver):
@@ -52,7 +54,11 @@ def navigate_and_answer_questions(driver):
         options_elements = question_element.find_elements(By.CLASS_NAME, 'theses-btn')
         
         # Ask user for response
-        response = input("Enter your response (ich stimme zu/neutral/ich stimme nicht zu): ").lower()
+        while True:
+            response = input("Enter your response (ich stimme zu/neutral/ich stimme nicht zu): ").lower()
+            if response in {"ich stimme zu", "neutral", "ich stimme nicht zu"}:
+                break
+            print("Invalid response. Please enter 'ich stimme zu', 'ich stimme nicht zu', or 'neutral'.")
         
         # Select radio button based on user response
         if response == "ich stimme zu":
@@ -61,9 +67,6 @@ def navigate_and_answer_questions(driver):
             options_elements[1].click()
         elif response == "ich stimme nicht zu":
             options_elements[2].click()
-        else:
-            print("Invalid response. Please enter 'ich stimme zu', 'ich stimme nicht zu', or 'neutral'.")
-            continue
         
         # Save question and response
         results.append([question_text, response])
@@ -79,8 +82,9 @@ def main():
     driver = webdriver.Chrome()  
     driver.get(url)
 
+    response = [None]  # A list to hold the user input asynchronously
     # Press the start button
-    press_start_button(driver)
+    press_start_button(driver, response)
 
     # Close the browser
     driver.quit()
